@@ -1,0 +1,5 @@
+	*They are first asking for a route with best time optimization and safety 
+	* Next they are asking us to add feature for cost saving and after that a 
+	  feature to add ship dimensions and other models related to the ship
+	*it is crucial to choose a suitable optimization method that can optimize several 	  parameters for a range of ships (with varying type, dimensions, drift 	  	  characteristics of a ship) and develop an algorithm to return an optimal route 	  within a reasonable computational time
+	*The algorithm can optimize for the voyage time and safety to begin with but with a 	  scope for addition of more optimization parameters
