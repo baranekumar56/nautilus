@@ -9,7 +9,7 @@ def to_radians(coords):
     return np.radians(coords)
 
 # def generate_grid():
-#     columns_file = 'num_columns_per_row_10km_pruned.csv'
+#     columns_file = 'num_columns_per_row_10km_pruned2.csv'
 #     num_cols_per_row = []
 
 #     with open(columns_file, 'r') as col_file:
@@ -28,14 +28,18 @@ def to_radians(coords):
 #     points_to_ind = {}
 #     points_to_bathy = {}
 
-#     with open('grid_points_with_bathymetry_10km_pruned.csv', 'r') as file:
+#     with open('grid_points_with_bathymetry_10km_pruned2.csv', 'r') as file:
 #         reader = csv.reader(file)
 #         next(reader)  # Skip the header
 #         o = 0
 #         for row in reader:
-#             lat, lon, is_land, bathymetry_depth, row_idx, col_idx = float(row[0]), float(row[1]), int(row[2]), float(row[3]), int(row[4]), int(row[5])
-
-#             cell = GridCell(lat, lon, is_land, bathymetry_depth)
+#             lat, lon, is_land, bathymetry_depth,near_coastline,  row_idx, col_idx = float(row[0]), float(row[1]), int(row[2]), float(row[3]),row[4], int(row[5]), int(row[6])
+#             if near_coastline == 'True':
+#                 near_coastline = 1
+#             else :
+#                 near_coastline = 0
+            
+#             cell = GridCell(lat, lon, is_land, bathymetry_depth, near_coastline)
 #             if not is_land:
 #                 o += 1
             
@@ -80,40 +84,28 @@ def generate_grid():
 
     files = ['num_cols_per_row.pkl','all_points.pkl', 'grid_cells.pkl', 'points_to_ind.pkl', 'grid.pkl', 'points_to_bathy.pkl']
 
-    with open('objects/num_cols_per_row.pkl', 'rb') as f:
+    with open('objects/num_cols_per_row2.pkl', 'rb') as f:
         num_cols_per_row = pickle.load(f)
 
-    with open('objects/all_points.pkl', 'rb') as f:
+    with open('objects/all_points2.pkl', 'rb') as f:
         all_points = pickle.load(f)
 
-    with open('objects/grid_cells.pkl', 'rb') as f:
+    with open('objects/grid_cells2.pkl', 'rb') as f:
         grid_cells = pickle.load(f)
 
-    with open('objects/points_to_ind.pkl', 'rb') as f:
+    with open('objects/points_to_ind2.pkl', 'rb') as f:
         points_to_ind = pickle.load(f)
 
-    with open('objects/grid.pkl', 'rb') as f:
+    with open('objects/grid2.pkl', 'rb') as f:
         grid = pickle.load(f)
 
-    with open('objects/points_to_bathy.pkl', 'rb') as f:
+    with open('objects/points_to_bathy2.pkl', 'rb') as f:
         points_to_bathy = pickle.load(f)
 
     print("All files are loaded successfully...")
 
     return grid, all_points, grid_cells, points_to_ind, num_cols_per_row, points_to_bathy
 
-
-def set_up_nearest_neighbour_tree(all_points):
-    all_points_rad = to_radians(all_points)
-    ballTree = BallTree(all_points_rad, metric="haversine")
-
-    return ballTree
-
-def get_nearest_balltree_node(balltree, lat, lon):
-    point = to_radians([[lat, lon]])
-    dist, index = balltree.query(point, k =1)
-
-    return dist, index
 
 def lat_lon_to_cartesian(lat, lon):
     lat_rad = np.radians(lat)
@@ -129,11 +121,12 @@ def build_KDTree(all_points):
     #     all_points_cartesian.append(lat_lon_to_cartesian(i[0], i[1]))
 
     # Load the KDTree from the file
-    with open('objects/kdtree_file.pkl', 'rb') as f:
+    kdtree = None
+    with open('objects/kdtree_file2.pkl', 'rb') as f:
         kdtree = pickle.load(f)
 
     # kdtree = KDTree(all_points_cartesian)
-    # with open('kdtree_file2.pkl', 'wb') as f:
+    # with open('objects/kdtree_file2.pkl', 'wb') as f:
     #     pickle.dump(kdtree, f)
     return kdtree
 
@@ -156,3 +149,12 @@ def haversine(lat1, lon1, lat2, lon2):
     distance_km = 6371.0 * c
     return distance_km
 
+def get_cost(dist,lat,lon,theta):
+#     print(np.degrees(theta),end = " ")
+#     print(dist,end = " ")
+    wind_dir = np.cos(abs(theta - np.radians(0)))*10
+#     print((wind_dir+10)/2,end = " ")
+    cost = 0.9997*(dist*10) + 0.0003*(-1*(wind_dir+10)/2)
+    cost1 = 1*(dist*10) + 0*((wind_dir+10)/2)
+#     print(cost,cost1)
+    return cost

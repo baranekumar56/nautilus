@@ -29,9 +29,9 @@ def plot_path_on_map( subsector_paths, traversed):
     #     lons_subsector = [lon for lat, lon in subsector]
     #     ax.plot(lons_subsector, lats_subsector, color=subsector_colors[i], label=f'Subsector {i+1}')
 
-    lats_subsector = [lat for lat, lon in traversed]
-    lons_subsector = [lon for lat, lon in traversed]
-    ax.scatter(lons_subsector, lats_subsector, color="yellow",s=1, label=f'Iso Chrone A*')
+    # lats_subsector = [lat for lat, lon in traversed]
+    # lons_subsector = [lon for lat, lon in traversed]
+    # ax.scatter(lons_subsector, lats_subsector, color="yellow",s=1, label=f'Iso Chrone A*')
 
     lats_subsector = [lat for lat, lon in subsector_paths]
     lons_subsector = [lon for lat, lon in subsector_paths]
@@ -49,10 +49,12 @@ def plot_path_on_map( subsector_paths, traversed):
 
 
 grid = Grid()
-start_lat, start_lon = 13.692259, 80.548244
-end_lat, end_lon =3.692259, 100.548244
-
+start_lat, start_lon = 11.3948, 115.33232
+end_lat, end_lon =13.692259, 80.548244
+t = time.time()
 path_lat_lon, distances = grid.a_star(start_lat, start_lon, end_lat, end_lon)
+x = time.time()
+print("Time Took: ", x - t)
 # with open('path.csv' , 'w') as f:
 #     for i in path_lat_lon:
 #         s = str(i[0]) + "," + str(i[1]) +"\n"

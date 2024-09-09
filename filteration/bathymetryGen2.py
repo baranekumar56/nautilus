@@ -13,8 +13,8 @@ EXCLUSION_RADIUS_KM = 22  # 22 km exclusion zone
 lat_range = np.arange(-35, 30, GRID_CELL_SIZE_KM / 111.32)[::-1]
 
 # Paths to files
-points_file = 'grid_points_with_bathymetry_10km_pruned.csv'
-columns_file = 'num_columns_per_row_10km_pruned.csv'  # File to store the number of columns for each row
+points_file = 'grid_points_with_bathymetry_10km_pruned2.csv'
+columns_file = 'num_columns_per_row_10km_pruned2.csv'  # File to store the number of columns for each row
 
 # Load the GEBCO netCDF file
 gebco_file_path = 'C:/Desktop/gebco_2024_sub_ice_topo/GEBCO_2024_sub_ice_topo.nc'
@@ -34,10 +34,13 @@ with open(points_file, 'w', newline='') as points_csv, open(columns_file, 'w', n
     
 
     # Write headers
-    points_writer.writerow(['Latitude', 'Longitude', 'Is_Land', 'Bathymetry_Depth', 'Row', 'Column'])
+    points_writer.writerow(['Latitude', 'Longitude', 'Is_Land', 'Bathymetry_Depth','Near_Coastline', 'Row', 'Column'])
     columns_writer.writerow(['Row', 'Num_Columns'])
     
     rowNum = 0
+
+    lats = dataset.variables['lat'][:]
+    lons = dataset.variables['lon'][:]
 
     for lat in lat_range:
         # Calculate dynamic lon_range for each latitude
@@ -46,8 +49,9 @@ with open(points_file, 'w', newline='') as points_csv, open(columns_file, 'w', n
         
         colNum = 0
         for lon in lon_range:
-            lat_idx = np.searchsorted(dataset.variables['lat'][:], lat)
-            lon_idx = np.searchsorted(dataset.variables['lon'][:], lon)
+            print(len(dataset.variables['lat']))
+            lat_idx = np.searchsorted(lats, lat)
+            lon_idx = np.searchsorted(lons, lon)
             bathymetry_depth = dataset.variables['elevation'][lat_idx, lon_idx]
             
             is_land = bathymetry_depth >= 0  # Typically, bathymetry values >= 0 indicate land
@@ -61,14 +65,15 @@ with open(points_file, 'w', newline='') as points_csv, open(columns_file, 'w', n
             
             # Calculate the distance to the nearest coastline point
             distance_to_coastline = geodesic((lat, lon), nearest_point).km
-            
             # Exclude the cell if it's within the exclusion radius
             if distance_to_coastline > EXCLUSION_RADIUS_KM:
-                valid_points.append([lat, lon, 1 if is_land else 0, bathymetry_depth, rowNum, colNum])
+                valid_points.append([lat, lon, 1 if is_land else 0, bathymetry_depth,False,  rowNum, colNum])
                 colNum += 1
             
             else:
-                count += 1
+                valid_points.append([lat, lon, 1 if is_land else 0, bathymetry_depth,True,  rowNum, colNum])
+                colNum += 1
+
         
         # Write valid points to CSV
         for point in valid_points:

@@ -1,4 +1,5 @@
 import csv
+import math
 import numpy as np
 from gridGeneration.gridGenUtils import *
 from sklearn.neighbors import BallTree
@@ -77,8 +78,8 @@ class Grid:
             if(row == end_row and col == end_col):
                 break
 
-            if current_distance > distances[row][col]:
-                continue
+            # if current_distance > distances[row][col]:
+            #     continue
 
             # Consider all 8 possible directions
             directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
@@ -86,7 +87,7 @@ class Grid:
                 r, c = row + dr, col + dc
                 if 0 <= r < num_rows and 0 <= c < self.num_cols_per_row[r]:
                     neighbor = self.grid[r][c]
-                    if neighbor is not None and not neighbor.is_land and neighbor.bathymetry_depth <= -20:
+                    if neighbor is not None and not neighbor.is_land and neighbor.bathymetry_depth <= -20 and not neighbor.near_coastline:
                         distance = haversine(self.grid[row][col].lat, self.grid[row][col].lon,neighbor.lat, neighbor.lon)
 
                         # distance = abs(self.grid[row][col].lat - self.grid[r][c].lat) * 111.32 + abs(self.grid[row][col].lon - self.grid[r][c].lon) * 111.32
@@ -114,14 +115,34 @@ class Grid:
     def a_star(self, start_lat, start_lon, end_lat, end_lon):
 
         # Find the nearest start and end cells
-        start_cell, _ = self.get_nearest_cell(start_lat, start_lon)
-        end_cell, _ = self.get_nearest_cell(end_lat, end_lon)
+        start_cell, dis = self.get_nearest_cell(start_lat, start_lon)
+        end_cell, dis = self.get_nearest_cell(end_lat, end_lon)
+        print(start_cell.near_coastline)
 
         start = (start_cell.lat, start_cell.lon)
         end = (end_cell.lat, end_cell.lon)
-        print(start)
-        print(end)
-        # Get indices of start and end cells
+        print(start, end)
+
+        directions = [
+            (2, 0),     # 0° (East)
+            (2, 1),     # 22.5°
+            (2, 2),     # 45° (Northeast)
+            (1, 2),     # 67.5°
+            (0, 2),     # 90° (North)
+            (-1, 2),    # 112.5°
+            (-2, 2),    # 135° (Northwest)
+            (-2, 1),    # 157.5°
+            (-2, 0),    # 180° (West)
+            (-2, -1),   # 202.5°
+            (-2, -2),   # 225° (Southwest)
+            (-1, -2),   # 247.5°
+            (0, -2),    # 270° (South)
+            (1, -2),    # 292.5°
+            (2, -2),    # 315° (Southeast)
+            (2, -1)     # 337.5°
+        ]
+        angles = np.radians(np.arange(0,360,22.5))
+       
         start_idx = self.point_to_ind.get(start, None)
         end_idx = self.point_to_ind.get(end, None)
 
@@ -147,16 +168,26 @@ class Grid:
             current_priority, (row, col) = heapq.heappop(priority_queue)
             traversed.append((self.grid[row][col].lat,self.grid[row][col].lon))
             # Check if we reached the goal
-            if(row == end_row and col == end_col):
+
+            if haversine(self.grid[row][col].lat,self.grid[row][col].lon, end_lat, end_lon) < 30:
+                end_row = row
+                end_col = col
+                break
+
+            if (row == end_row and col == end_col):
                 break
 
             # Consider all 8 possible directions
-            directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-            for dr, dc in directions:
+            # directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+            # directions = [(-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, 3), (-1, 3), (0, 3), (1, 3), (2, 3), (3, 3), 
+            #   (3, 2), (3, 1), (3, 0), (3, -1), (3, -2), (3, -3), (2, -3), (1, -3), (0, -3), (-1, -3), 
+            #   (-2, -3), (-3, -3), (-3, -2), (-3, -1)]
+
+            for i,(dr, dc) in enumerate(directions):
                 r, c = row + dr, col + dc
                 if 0 <= r < num_rows and 0 <= c < self.num_cols_per_row[r]:
                     neighbor = self.grid[r][c]
-                    if neighbor is not None and not neighbor.is_land and neighbor.bathymetry_depth <= -20:
+                    if neighbor is not None and not neighbor.is_land and neighbor.bathymetry_depth <= -20 and not neighbor.near_coastline:
                         # Calculate actual distance between current cell and neighbor
                         distance = haversine(
                             self.grid[row][col].lat, self.grid[row][col].lon,
@@ -165,8 +196,8 @@ class Grid:
 
                         new_distance = distances[row][col] + distance
                         heuristic = haversine(neighbor.lat, neighbor.lon, self.grid[end_row][end_col].lat, self.grid[end_row][end_col].lon)
-                        priority = new_distance + heuristic
-
+                        priority =  get_cost(heuristic+new_distance,start_lat,end_lat,angles[i])
+                        traversed.append((r,c))
                         if new_distance < distances[r][c]:
                             distances[r][c] = new_distance
                             prev[r][c] = (row, col)
@@ -508,7 +539,7 @@ class Grid:
         while open_list:
             # Get the node with the lowest f = g + h
             current_cost, current_heuristic, (lat, lon), heading, parent = heapq.heappop(open_list)
-            print(count, end=' ')
+            # print(count, end=' ')
             count += 1
             # Check if we've reached the destination
             if heuristic(lat, lon, end_lat, end_lon) < 5:  # Close enough to destination
@@ -588,7 +619,7 @@ class Grid:
 
             # Check if we reached the goal
     #         print(f"{row,col}",end = " ")
-            if cnt > 5000:
+            if cnt > 20000:
                 end_row = row
                 end_col = col
                 break
@@ -614,7 +645,7 @@ class Grid:
                 #checking if valid neighbour or not
                 nearest_cell, _ = self.get_nearest_cell(r,c)
                 
-                if nearest_cell.bathymetry_depth > -10 or nearest_cell in vis:
+                if nearest_cell.bathymetry_depth > 0 or nearest_cell in vis or nearest_cell.near_coastline:
                     continue
 
                 distance = haversine(row,col,r,c)
