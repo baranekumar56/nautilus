@@ -20,11 +20,12 @@ class Grid:
     kdtree = None
     num_cols_per_row = []
     coord_to_bathy = {}
+    wgrid = None
     def __init__(self) -> None:
         # setting up the grid 
         #doing all the reqired things like setting up the grid and creating neighbour trees and search indexes
         t = time.time()
-        self.grid,self.all_points, self.grid_cells, self.point_to_ind, self.num_cols_per_row, self.coord_to_bathy  = generate_grid()
+        self.grid,self.all_points, self.grid_cells, self.point_to_ind, self.num_cols_per_row, self.coord_to_bathy,self.wgrid  = generate_grid()
 
         #setting up the nearest neighbour tree
         # self.ball_tree = set_up_nearest_neighbour_tree(self.all_points)
@@ -112,36 +113,66 @@ class Grid:
 
         return (path_lat_lon,traversed)
 
-    def a_star(self, start_lat, start_lon, end_lat, end_lon):
+    def a_star(self, start_lat, start_lon, end_lat, end_lon,initial_time,initial_speed,flag):
 
         # Find the nearest start and end cells
         start_cell, dis = self.get_nearest_cell(start_lat, start_lon)
         end_cell, dis = self.get_nearest_cell(end_lat, end_lon)
-        print(start_cell.near_coastline)
+        print("Start Cell is Land:", start_cell.is_land)
+        print("End Cell is Land:", end_cell.is_land)
+
+        # print(start_cell.near_coastline)
 
         start = (start_cell.lat, start_cell.lon)
         end = (end_cell.lat, end_cell.lon)
         print(start, end)
 
+        # directions = [
+        #     (2, 0),     # 0° (East)
+        #     (2, 1),     # 22.5°
+        #     (2, 2),     # 45° (Northeast)
+        #     (1, 2),     # 67.5°
+        #     (0, 2),     # 90° (North)
+        #     (-1, 2),    # 112.5°
+        #     (-2, 2),    # 135° (Northwest)
+        #     (-2, 1),    # 157.5°
+        #     (-2, 0),    # 180° (West)
+        #     (-2, -1),   # 202.5°
+        #     (-2, -2),   # 225° (Southwest)
+        #     (-1, -2),   # 247.5°
+        #     (0, -2),    # 270° (South)
+        #     (1, -2),    # 292.5°
+        #     (2, -2),    # 315° (Southeast)
+        #     (2, -1)     # 337.5°
+        # ]
         directions = [
-            (2, 0),     # 0° (East)
-            (2, 1),     # 22.5°
-            (2, 2),     # 45° (Northeast)
-            (1, 2),     # 67.5°
-            (0, 2),     # 90° (North)
-            (-1, 2),    # 112.5°
-            (-2, 2),    # 135° (Northwest)
-            (-2, 1),    # 157.5°
-            (-2, 0),    # 180° (West)
-            (-2, -1),   # 202.5°
-            (-2, -2),   # 225° (Southwest)
-            (-1, -2),   # 247.5°
-            (0, -2),    # 270° (South)
-            (1, -2),    # 292.5°
-            (2, -2),    # 315° (Southeast)
-            (2, -1)     # 337.5°
+        (0, 3),      # 0° (East)
+        (1, 3),      # 15°
+        (2, 3),      # 30°
+        (3, 3),      # 45° (Northeast)
+        (3, 2),      # 60°
+        (3, 1),      # 75°
+        (3, 0),      # 90° (North)
+        (3, -1),     # 105°
+        (3, -2),     # 120°
+        (3, -3),     # 135° (Northwest)
+        (2, -3),     # 150°
+        (1, -3),     # 165°
+        (0, -3),     # 180° (West)
+        (-1, -3),    # 195°
+        (-2, -3),    # 210°
+        (-3, -3),    # 225° (Southwest)
+        (-3, -2),    # 240°
+        (-3, -1),    # 255°
+        (-3, 0),     # 270° (South)
+        (-3, 1),     # 285°
+        (-3, 2),     # 300°
+        (-3, 3),     # 315° (Southeast)
+        (-2, 3),     # 330°
+        (-1, 3)      # 345°
         ]
-        angles = np.radians(np.arange(0,360,22.5))
+
+        angles = np.radians(np.arange(0,360,15))
        
         start_idx = self.point_to_ind.get(start, None)
         end_idx = self.point_to_ind.get(end, None)
@@ -162,12 +193,11 @@ class Grid:
 
         # Priority queue (min-heap) with (priority, (row, col))
         priority_queue = []
-        heapq.heappush(priority_queue, (0, (start_row, start_col)))
-        traversed = []
+        heapq.heappush(priority_queue, (0, (start_row, start_col,0)))
+        count = 0
         while priority_queue:
-            current_priority, (row, col) = heapq.heappop(priority_queue)
-            traversed.append((self.grid[row][col].lat,self.grid[row][col].lon))
-            # Check if we reached the goal
+            count+=1
+            current_priority, (row, col,curr_time) = heapq.heappop(priority_queue)
 
             if haversine(self.grid[row][col].lat,self.grid[row][col].lon, end_lat, end_lon) < 30:
                 end_row = row
@@ -177,11 +207,6 @@ class Grid:
             if (row == end_row and col == end_col):
                 break
 
-            # Consider all 8 possible directions
-            # directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-            # directions = [(-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, 3), (-1, 3), (0, 3), (1, 3), (2, 3), (3, 3), 
-            #   (3, 2), (3, 1), (3, 0), (3, -1), (3, -2), (3, -3), (2, -3), (1, -3), (0, -3), (-1, -3), 
-            #   (-2, -3), (-3, -3), (-3, -2), (-3, -1)]
 
             for i,(dr, dc) in enumerate(directions):
                 r, c = row + dr, col + dc
@@ -193,11 +218,122 @@ class Grid:
                             self.grid[row][col].lat, self.grid[row][col].lon,
                             neighbor.lat, neighbor.lon
                         )
-
+                        dtime = (distance/initial_speed) *(5/18)
                         new_distance = distances[row][col] + distance
                         heuristic = haversine(neighbor.lat, neighbor.lon, self.grid[end_row][end_col].lat, self.grid[end_row][end_col].lon)
-                        priority =  get_cost(heuristic+new_distance,start_lat,end_lat,angles[i])
-                        traversed.append((r,c))
+                        priority = None
+                        if(flag):
+                            cost = get_cost(r,c,angles[i],curr_time+dtime,self.wgrid)
+                            if(type(cost) == str):
+                                priority = heuristic + new_distance
+                                flag = False
+                            else:
+                                priority = 0.2*(heuristic + new_distance) + 0.8*(cost)
+                        else:
+                            priority = heuristic + new_distance
+                        # priority =  get_cost(heuristic+new_distance,start_lat,end_lat,angles[i])
+                        # priority = adjusted_priority(self.grid[row][col].lat,self.grid[row][col].lon, self.grid[r][c].lat, self.grid[r][c].lon, end_lat, end_lon)
+                        
+                        if new_distance < distances[r][c]:
+                            distances[r][c] = new_distance
+                            prev[r][c] = (row, col)
+                            heapq.heappush(priority_queue, (priority, (r, c,curr_time+dtime)))
+
+        # Reconstruct the shortest path
+        path = []
+        step = (end_row, end_col)
+        while step is not None:
+            path.append(step)
+            step = prev[step[0]][step[1]]
+        path.reverse()
+
+        # Convert indices to lat/lon for path
+        path_lat_lon = [(self.grid[row][col].lat, self.grid[row][col].lon) for row, col in path]
+
+        print("Size of Path:", len(path))
+        print("Total Distance Taken:", distances[end_row][end_col])
+        return (path_lat_lon)
+
+    def have_path(self, start_lat, start_lon, end_lat, end_lon):
+        start_cell, dis = self.get_nearest_cell(start_lat, start_lon)
+        end_cell, dis = self.get_nearest_cell(end_lat, end_lon)
+        print("Start Cell is Land:", start_cell.is_land)
+        print("End Cell is Land:", end_cell.is_land)
+
+
+        start = (start_cell.lat, start_cell.lon)
+        end = (end_cell.lat, end_cell.lon)
+        print(start, end)
+        directions = [
+        (0, 3),      # 0° (East)
+        (1, 3),      # 15°
+        (2, 3),      # 30°
+        (3, 3),      # 45° (Northeast)
+        (3, 2),      # 60°
+        (3, 1),      # 75°
+        (3, 0),      # 90° (North)
+        (3, -1),     # 105°
+        (3, -2),     # 120°
+        (3, -3),     # 135° (Northwest)
+        (2, -3),     # 150°
+        (1, -3),     # 165°
+        (0, -3),     # 180° (West)
+        (-1, -3),    # 195°
+        (-2, -3),    # 210°
+        (-3, -3),    # 225° (Southwest)
+        (-3, -2),    # 240°
+        (-3, -1),    # 255°
+        (-3, 0),     # 270° (South)
+        (-3, 1),     # 285°
+        (-3, 2),     # 300°
+        (-3, 3),     # 315° (Southeast)
+        (-2, 3),     # 330°
+        (-1, 3)      # 345°
+        ]
+       
+        start_idx = self.point_to_ind.get(start, None)
+        end_idx = self.point_to_ind.get(end, None)
+
+        if start_idx is None or end_idx is None:
+            raise ValueError("Start or end cell not found in grid.")
+
+        start_row, start_col = start_idx
+        print(start_idx)
+        print(end_idx)
+        end_row, end_col = end_idx
+
+        num_rows = len(self.grid)
+        distances = np.full((num_rows, max(self.num_cols_per_row)), np.inf)
+        distances[start_row][start_col] = 0
+        prev = np.full((num_rows, max(self.num_cols_per_row)), None)
+
+        priority_queue = []
+        heapq.heappush(priority_queue, (0, (start_row, start_col)))
+
+        while priority_queue:
+            current_priority, (row, col) = heapq.heappop(priority_queue)
+
+            if haversine(self.grid[row][col].lat,self.grid[row][col].lon, end_lat, end_lon) < 30:
+                end_row = row
+                end_col = col
+                break
+
+            if (row == end_row and col == end_col):
+                break
+
+            for i,(dr, dc) in enumerate(directions):
+                r, c = row + dr, col + dc
+                if 0 <= r < num_rows and 0 <= c < self.num_cols_per_row[r]:
+                    neighbor = self.grid[r][c]
+                    if neighbor is not None and not neighbor.is_land and neighbor.bathymetry_depth <= -20 and not neighbor.near_coastline:
+                        distance = haversine(
+                            self.grid[row][col].lat, self.grid[row][col].lon,
+                            neighbor.lat, neighbor.lon
+                        )
+                        new_distance = distances[row][col] + distance
+                        heuristic = haversine(neighbor.lat, neighbor.lon, self.grid[end_row][end_col].lat, self.grid[end_row][end_col].lon)
+                        priority = heuristic
+                        
                         if new_distance < distances[r][c]:
                             distances[r][c] = new_distance
                             prev[r][c] = (row, col)
@@ -216,121 +352,7 @@ class Grid:
 
         print("Size of Path:", len(path))
         print("Total Distance Taken:", distances[end_row][end_col])
-        return (path_lat_lon,traversed)
-
-
-    def isochrone1(self, start_lat, start_lon, end_lat, end_lon):
-    # Going to the nearest bounding box
-        dis, start = get_nearest_kdtree_node(self.kdtree, start_lat, start_lon)
-        start = (self.all_points[start[0][0]])
-        start = (start[0], start[1])
-        dis, end = get_nearest_kdtree_node(self.kdtree, end_lat, end_lon)
-        end = (self.all_points[end[0][0]])
-        end = (end[0], end[1])
-
-        if self.coord_to_bathy[start] >= -10 or self.coord_to_bathy[end] >= -10:
-            print("Cannot generate map as it intersects land")
-            return []
-
-        # Constants
-        DELTA_T = 1  # Time interval (hours)
-        STEP_SIZE = 10  # Distance increment for generating waypoints (km)
-        NUM_WAYPOINTS = 36  # Number of waypoints per isochrone
-        WAYPOINTS_PER_SUBSECTOR = 1  # Number of closest waypoints to keep
-        SUBSECTOR_COUNT = 3  # Number of subsectors on each side of the reference path
-        SUBSECTOR_DISTANCE = 100  # Distance between subsectors (km)
-
-        def generate_circular_waypoints(start, num_waypoints, radius):
-            waypoints = []
-            for i in range(num_waypoints):
-                angle = 360.0 * i / num_waypoints
-                dlat = radius * np.cos(np.radians(angle)) / 111  # Approximation: 1 degree latitude ≈ 111 km
-                dlon = radius * np.sin(np.radians(angle)) / (111 * np.cos(np.radians(start[0])))
-                waypoints.append((start[0] + dlat, start[1] + dlon))
-            return waypoints
-
-        def generate_subsector_points(start, end, subsector_count, subsector_distance):
-            subsector_points = []
-            great_circle_bearing = np.arctan2(end[1] - start[1], end[0] - start[0])
-
-            for i in range(-subsector_count, subsector_count + 1):
-                bearing_offset = i * (subsector_distance / haversine(start[0], start[1], end[0], end[1]))
-                new_bearing = great_circle_bearing + bearing_offset
-                dx = subsector_distance * np.cos(new_bearing) / 111
-                dy = subsector_distance * np.sin(new_bearing) / (111 * np.cos(np.radians(start[0])))
-                new_point = (start[0] + dx, start[1] + dy)
-                subsector_points.append(new_point)
-            return subsector_points
-
-        def power_subsector_successors(last_waypoint, num_successors, heading, delta_heading):
-            """ Generate multiple successors with heading adjustments in the second half of the voyage """
-            successors = []
-            for j in range(-num_successors, num_successors + 1):
-                adjusted_heading = heading + j * delta_heading
-                dx = STEP_SIZE * np.cos(np.radians(adjusted_heading)) / 111
-                dy = STEP_SIZE * np.sin(np.radians(adjusted_heading)) / (111 * np.cos(np.radians(last_waypoint[0])))
-                new_point = (last_waypoint[0] + dx, last_waypoint[1] + dy)
-                successors.append(new_point)
-            return successors
-
-        def generate_isochrones_with_power_subsectors(start, end, speed, num_isochrones=3, step_size=STEP_SIZE):
-            subsector_paths = {i: [start] for i in range(-SUBSECTOR_COUNT, SUBSECTOR_COUNT + 1)}
-            total_distances = {i: 0.0 for i in range(-SUBSECTOR_COUNT, SUBSECTOR_COUNT + 1)}
-
-            # First half: Use regular greedy isochrone logic
-            half_isochrones = num_isochrones // 2
-            for n in range(1, half_isochrones + 1):
-                max_distance = n * speed * DELTA_T
-                for subsector_idx, subsector_waypoints in subsector_paths.items():
-                    last_waypoint = subsector_waypoints[-1]
-                    new_waypoints = generate_circular_waypoints(last_waypoint, NUM_WAYPOINTS, step_size)
-
-                    valid_waypoints = []
-                    for wp in new_waypoints:
-                        dis, wp = get_nearest_kdtree_node(self.kdtree, wp[0], wp[1])
-                        wp = (self.all_points[wp[0][0]])
-                        wp = (wp[0], wp[1])
-                        if wp in self.coord_to_bathy and self.coord_to_bathy[wp] < 0:
-                            dist_to_end = haversine(wp[0], wp[1], end[0], end[1])
-                            valid_waypoints.append((wp, dist_to_end))
-
-                    valid_waypoints.sort(key=lambda x: x[1])
-
-                    if valid_waypoints:
-                        best_waypoint, dist_to_end = valid_waypoints[0]
-                        subsector_paths[subsector_idx].append(best_waypoint)
-                        total_distances[subsector_idx] += haversine(last_waypoint[0], last_waypoint[1], best_waypoint[0], best_waypoint[1])
-
-            # Second half: Apply power subsector logic
-            for n in range(half_isochrones + 1, num_isochrones + 1):
-                max_distance = n * speed * DELTA_T
-                for subsector_idx, subsector_waypoints in subsector_paths.items():
-                    last_waypoint = subsector_waypoints[-1]
-                    heading = np.arctan2(end[1] - last_waypoint[1], end[0] - last_waypoint[0])
-                    successors = power_subsector_successors(last_waypoint, 2, heading, 10)  # m = 2, ΔC = 10 degrees
-
-                    valid_successors = []
-                    for wp in successors:
-                        dis, wp = get_nearest_kdtree_node(self.kdtree, wp[0], wp[1])
-                        wp = (self.all_points[wp[0][0]])
-                        wp = (wp[0], wp[1])
-                        if wp in self.coord_to_bathy and self.coord_to_bathy[wp] < 0:
-                            fuel_cost = haversine(last_waypoint[0], last_waypoint[1], wp[0], wp[1])
-                            valid_successors.append((wp, fuel_cost))
-
-                    valid_successors.sort(key=lambda x: x[1])
-
-                    if valid_successors:
-                        best_successor, fuel_cost = valid_successors[0]
-                        subsector_paths[subsector_idx].append(best_successor)
-                        total_distances[subsector_idx] += haversine(last_waypoint[0], last_waypoint[1], best_successor[0], best_successor[1])
-
-            return subsector_paths, total_distances
-
-        p, d = generate_isochrones_with_power_subsectors(start=start, end=end, speed=20, num_isochrones=90)
-        return p, d
-
-
+        return (path_lat_lon)
 
     def isochrone(self, start_lat, start_lon, end_lat, end_lon):
         #going to the nearest bounding box

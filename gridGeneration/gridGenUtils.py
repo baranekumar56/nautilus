@@ -4,7 +4,6 @@ from models.cell import GridCell
 from sklearn.neighbors import BallTree
 from sklearn.neighbors import KDTree
 import pickle
-
 def to_radians(coords):
     return np.radians(coords)
 
@@ -73,6 +72,7 @@ def to_radians(coords):
 #     return grid, all_points, grid_cells, points_to_ind, num_cols_per_row, points_to_bathy
 
 #instead of creating we will be loading all the data from now
+# w_grid = None
 
 def generate_grid():
     num_cols_per_row = None
@@ -81,8 +81,7 @@ def generate_grid():
     points_to_ind = None 
     grid = None 
     points_to_bathy = None
-
-    files = ['num_cols_per_row.pkl','all_points.pkl', 'grid_cells.pkl', 'points_to_ind.pkl', 'grid.pkl', 'points_to_bathy.pkl']
+    wgrid = None
 
     with open('objects/num_cols_per_row2.pkl', 'rb') as f:
         num_cols_per_row = pickle.load(f)
@@ -101,10 +100,13 @@ def generate_grid():
 
     with open('objects/points_to_bathy2.pkl', 'rb') as f:
         points_to_bathy = pickle.load(f)
+    with open('objects/weather_grid.pkl','rb') as f:
+        wgrid = pickle.load(f)
 
+    # w_grid = wgrid
     print("All files are loaded successfully...")
 
-    return grid, all_points, grid_cells, points_to_ind, num_cols_per_row, points_to_bathy
+    return grid, all_points, grid_cells, points_to_ind, num_cols_per_row, points_to_bathy, wgrid
 
 
 def lat_lon_to_cartesian(lat, lon):
@@ -135,26 +137,138 @@ def get_nearest_kdtree_node(kdtree, lat,lon):
     dist, ind = kdtree.query([point])
     return dist, ind
 
+
+def get_cost(row,col,ship_heading,time,wgrid):
+    time = int(time)
+    time = time % 24
+    wthr_obj = wgrid[row][col]
+    wave_height = wthr_obj.Thgt[time]
+    wave_period = wthr_obj.Tper[time]
+    wave_direction = wthr_obj.Tdir[time]
+    speed =  5 * wave_height**2 /wave_period
+    dir = -1*(100/speed) * np.cos(np.radians(ship_heading - wave_direction))
+    return speed+dir
+
+
+import math
+
 def haversine(lat1, lon1, lat2, lon2):
-    # Convert latitude and longitude from degrees to radians
-    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-    
+    # Radius of the Earth in km
+    R = 6371.0
+
+    # Convert degrees to radians
+    lat1, lon1 = math.radians(lat1), math.radians(lon1)
+    lat2, lon2 = math.radians(lat2), math.radians(lon2)
+
     # Haversine formula
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-    
-    # Distance in kilometers (Earth's radius = 6371 km)
-    distance_km = 6371.0 * c
-    return distance_km
 
-def get_cost(dist,lat,lon,theta):
-#     print(np.degrees(theta),end = " ")
-#     print(dist,end = " ")
-    wind_dir = np.cos(abs(theta - np.radians(0)))*10
-#     print((wind_dir+10)/2,end = " ")
-    cost = 0.9997*(dist*10) + 0.0003*(-1*(wind_dir+10)/2)
-    cost1 = 1*(dist*10) + 0*((wind_dir+10)/2)
-#     print(cost,cost1)
-    return cost
+    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    # Distance in km
+    return R * c
+
+def calculate_bearing(lat1, lon1, lat2, lon2):
+    # Convert latitude and longitude from degrees to radians
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+
+    # Compute the difference in longitudes
+    dlon = lon2 - lon1
+
+    # Calculate bearing using the formula
+    x = math.sin(dlon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(dlon))
+
+    # atan2 to get the angle in radians and convert to degrees
+    bearing = math.atan2(x, y)
+    bearing = math.degrees(bearing)
+    
+    # Normalize the bearing to 0 - 360 degrees
+    return (bearing + 360) % 360
+
+def relative_angle_adjustment(current_lat, current_lon, neighbor_lat, neighbor_lon, target_lat, target_lon):
+    # Get the bearings
+    bearing_current_to_target = calculate_bearing(current_lat, current_lon, target_lat, target_lon)
+    bearing_current_to_neighbor = calculate_bearing(current_lat, current_lon, neighbor_lat, neighbor_lon)
+    
+    # Relative angle between the two bearings
+    relative_angle = abs(bearing_current_to_neighbor - bearing_current_to_target)
+    
+    # Adjust to fall within 0-180 degrees
+    relative_angle = min(relative_angle, 360 - relative_angle)
+    
+    # Convert to radians for cosine calculation
+    relative_angle_rad = math.radians(relative_angle)
+    
+    return math.cos(relative_angle_rad)
+
+def adjusted_priorityy(current_lat, current_lon, neighbor_lat, neighbor_lon, target_lat, target_lon):
+    # Calculate the new distance using the haversine formula
+    new_distance = haversine(current_lat, current_lon, neighbor_lat, neighbor_lon)
+    
+    # Get the adjustment factor based on the relative angle
+    cos_adjustment = relative_angle_adjustment(current_lat, current_lon, neighbor_lat, neighbor_lon, target_lat, target_lon)
+    
+    # Adjust the distance based on the cosine of the relative angle
+    adjusted_distance = new_distance * (1 + cos_adjustment)
+    
+    # Calculate the heuristic (haversine between neighbor and end cell)
+    heuristic = haversine(neighbor_lat, neighbor_lon, target_lat, target_lon)
+    
+    # New priority is heuristic + adjusted distance
+    return heuristic + adjusted_distance
+
+
+def adjusted_priority(lat1, lon1, lat2, lon2, goal_lat, goal_lon):
+    # Calculate the bearing from the current node to the neighbor
+    bearing_current_to_neighbor = calculate_bearing(lat1, lon1, lat2, lon2)
+    
+    # Calculate the bearing from the neighbor to the goal
+    bearing_neighbor_to_goal = calculate_bearing(lat2, lon2, goal_lat, goal_lon)
+    
+    # Compute the relative angle between the two bearings
+    relative_angle = abs(bearing_current_to_neighbor - bearing_neighbor_to_goal)
+    
+    # Normalize the relative angle to be between 0 and 180 degrees
+    if relative_angle > 180:
+        relative_angle = 360 - relative_angle
+    
+    # Convert the relative angle to radians
+    relative_angle_rad = math.radians(relative_angle)
+    
+    # Apply the cosine adjustment to the distance
+    distance = haversine(lat1, lon1, lat2, lon2)
+    adjusted_distance = distance * (1 - 0.5 * (1 - math.cos(relative_angle_rad)))
+    
+    # Calculate the heuristic (distance from neighbor to goal)
+    heuristic = haversine(lat2, lon2, goal_lat, goal_lon)
+    
+    # Priority is the new adjusted distance plus heuristic
+    return adjusted_distance + heuristic
+
+def calculate_bearing(lat1, lon1, lat2, lon2):
+    # Convert latitude and longitude from degrees to radians
+    lat1_rad = math.radians(lat1)
+    lon1_rad = math.radians(lon1)
+    lat2_rad = math.radians(lat2)
+    lon2_rad = math.radians(lon2)
+    
+    # Compute the bearing
+    d_lon = lon2_rad - lon1_rad
+    x = math.sin(d_lon) * math.cos(lat2_rad)
+    y = math.cos(lat1_rad) * math.sin(lat2_rad) - math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(d_lon)
+    
+    initial_bearing = math.atan2(x, y)
+    
+    # Convert bearing from radians to degrees
+    initial_bearing_deg = math.degrees(initial_bearing)
+    
+    # Normalize the bearing to be within 0 to 360 degrees
+    compass_bearing = (initial_bearing_deg + 360) % 360
+    return compass_bearing
+
