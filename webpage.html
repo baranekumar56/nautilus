@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ship Voyage Planner</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        header {
+            background-color: #0077be;
+            color: white;
+            padding: 1em;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 30%;
+            padding: 20px;
+            background-color: #f0f0f0;
+            overflow-y: auto;
+        }
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        .map-container #map {
+            width: 100%;
+            height: 100%;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        .btn {
+            background-color: #0077be;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2em;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .btn:hover {
+            background-color: #005f9e;
+        }
+        .sub-heading {
+            margin-top: 20px;
+            font-size: 1.3em;
+            color: #333;
+        }
+        .map-option {
+            cursor: pointer;
+            color: #0077be;
+            font-size: 0.9em;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Ship Voyage Planner</h1>
+</header>
+
+<div class="container">
+    <div class="sidebar">
+        <h2>Input Coordinates</h2>
+
+        <label for="departure-latitude">Departure Latitude</label>
+        <input type="text" id="departure-latitude" placeholder="Enter latitude">
+        <span class="map-option" onclick="setFromMap('start')">Choose from Map</span>
+
+        <label for="departure-longitude">Departure Longitude</label>
+        <input type="text" id="departure-longitude" placeholder="Enter longitude">
+
+        <label for="arrival-latitude">Arrival Latitude</label>
+        <input type="text" id="arrival-latitude" placeholder="Enter latitude">
+        <span class="map-option" onclick="setFromMap('end')">Choose from Map</span>
+
+        <label for="arrival-longitude">Arrival Longitude</label>
+        <input type="text" id="arrival-longitude" placeholder="Enter longitude">
+
+        <div class="sub-heading">Ship Specifications</div>
+
+        <label for="speed">Maximum Ship Speed (km)</label>
+        <input type="number" id="speed" value="20">
+
+        <label for="length">Length (m)</label>
+        <input type="number" id="length" value="230">
+
+        <label for="draft">Design Draft (m)</label>
+        <input type="number" id="draft" value="10.8">
+
+        <label for="breadth">Moulded Breadth (m)</label>
+        <input type="number" id="breadth" value="32.2">
+
+        <label for="displacement">Displacement (m3)</label>
+        <input type="number" id="displacement" value="52030">
+
+        <label for="block-coefficient">Block Coefficient</label>
+        <input type="number" id="block-coefficient" value="0.8" step="0.01">
+
+        <button class="btn" onclick="getVoyage()">Get Voyage</button>
+    </div>
+
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    // Initialize the map
+    var map = L.map('map').setView([16, 80], 5); // Initial center of map (lat, lon)
+
+    // Add OpenStreetMap tiles to the map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    var startMarker, endMarker;
+    var startCoords = [16, 80]; // Default start coordinates
+    var endCoords = [17, 81]; // Default end coordinates
+    var pathPolyline; // To store the plotted path polyline
+
+    // Add initial markers for Start and End points
+    function addMarkers() {
+        startMarker = L.marker(startCoords, {draggable: true}).addTo(map).bindPopup('Start Point').openPopup();
+        endMarker = L.marker(endCoords, {draggable: true}).addTo(map).bindPopup('End Point');
+
+        startMarker.on('dragend', function(e) {
+            var coords = startMarker.getLatLng();
+            startCoords = [coords.lat, coords.lng];
+            updateInputFields();
+        });
+
+        endMarker.on('dragend', function(e) {
+            var coords = endMarker.getLatLng();
+            endCoords = [coords.lat, coords.lng];
+            updateInputFields();
+        });
+    }
+
+    addMarkers();
+
+    // Update input fields based on marker positions
+    function updateInputFields() {
+        document.getElementById('departure-latitude').value = startCoords[0];
+        document.getElementById('departure-longitude').value = startCoords[1];
+        document.getElementById('arrival-latitude').value = endCoords[0];
+        document.getElementById('arrival-longitude').value = endCoords[1];
+    }
+
+    // Set coordinates from map click
+    function setFromMap(type) {
+        map.once('click', function(e) {
+            var coords = [e.latlng.lat, e.latlng.lng];
+            if (type === 'start') {
+                startCoords = coords;
+                startMarker.setLatLng(coords);
+            } else if (type === 'end') {
+                endCoords = coords;
+                endMarker.setLatLng(coords);
+            }
+            updateInputFields();
+        });
+    }
+
+    // Function to get the voyage details
+    function getVoyage() {
+        const depLat = document.getElementById('departure-latitude').value;
+        const depLon = document.getElementById('departure-longitude').value;
+        const arrLat = document.getElementById('arrival-latitude').value;
+        const arrLon = document.getElementById('arrival-longitude').value;
+
+        // Simulate server response with a list of lat/lon coordinates
+        const voyagePath = [
+            [parseFloat(depLat), parseFloat(depLon)], // Start point
+            [16.5, 80.5], // Intermediate points
+            [17.0, 81.0],
+            [parseFloat(arrLat), parseFloat(arrLon)] // End point
+        ];
+
+        // Remove the previous path if it exists
+        if (pathPolyline) {
+            map.removeLayer(pathPolyline);
+        }
+
+        // Draw the new path on the map
+        pathPolyline = L.polyline(voyagePath, { color: 'blue' }).addTo(map);
+        map.fitBounds(pathPolyline.getBounds()); // Adjust map view to fit the path
+
+        alert(`Voyage path plotted from (${depLat}, ${depLon}) to (${arrLat}, ${arrLon})`);
+    }
+</script>
+
+</body>
+</html>
