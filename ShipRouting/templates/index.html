@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shipping Voyage Planner</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+    />
+
+    <style>
+      * {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue",
+          sans-serif !important;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      @import url("https://fonts.googleapis.com/css?family=Poppins:400,500,600,700&display=swap");
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Poppins", sans-serif;
+      }
+      ::selection {
+        background: #4158d0;
+        color: #fff;
+      }
+      .header {
+        height: 50px;
+        width: 100%;
+        /* position: relative; */
+        /* top: 0; */
+        /* left: 0; */
+        background: linear-gradient(-135deg, #534e57, #94c9e7);
+        /* z-index: 1000; */
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: bold;
+        text-align: center;
+      }
+      .title {
+        font-size: 35px;
+        font-weight: 600;
+        text-align: center;
+        line-height: 100px;
+        color: #fff;
+        user-select: none;
+        border-radius: 15px 15px 0 0;
+        padding: 10px;
+        background: linear-gradient(-135deg, #534e57, #94c9e7);
+      }
+      #main {
+        transition: margin-left 0.5s;
+        padding: 16px;
+      }
+      .container {
+        display: flex;
+        flex-wrap: wrap;
+        height: calc(100vh - 50px);
+        /* margin-top: 40px; */
+        width: 100vw;
+      }
+      .map-container {
+        flex: 1;
+        width: 100vw;
+        /* margin-top:10px; */
+        position: relative;
+      }
+      .map-container #map {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      .form .field {
+        height: 50px;
+        width: 100%;
+        margin-top: 20px;
+        position: relative;
+      }
+      .form .field input {
+        height: 100%;
+        width: 100%;
+        outline: none;
+        font-size: 17px;
+        padding-left: 20px;
+        border: 1px solid lightgrey;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+      }
+      .form .field input:focus,
+      form .field input:valid {
+        border-color: #4158d0;
+      }
+      .form .field label {
+        position: absolute;
+        top: 50%;
+        left: 20px;
+        color: #999999;
+        font-weight: 400;
+        font-size: 17px;
+        pointer-events: none;
+        transform: translateY(-50%);
+        transition: all 0.3s ease;
+      }
+      .form .field input:focus ~ label,
+      .form .field input:valid ~ label {
+        top: 0%;
+        font-size: 16px;
+        color: #4158d0;
+        background: #fff;
+        transform: translateY(-50%);
+      }
+      .btn {
+        color: #fff;
+        border: 1px;
+        border-radius: 25px;
+        padding-left: 0;
+        font-size: 20px;
+        font-weight: 500;
+        cursor: pointer;
+        background: linear-gradient(-135deg, #534e57, #94c9e7);
+        transition: all 0.3s ease;
+        display: block;
+        margin: auto;
+        padding: 10px;
+      }
+      .field .btn:active {
+        transform: scale(0.95);
+      }
+      #sidebar {
+        height: 90%;
+        width: 0;
+        position: fixed;
+        z-index: 1;
+        top: 50px;
+        left: 0;
+        overflow-x: hidden;
+        transition: 0.5s;
+        padding-top: 60px;
+      }
+
+      /* sidebar.style.width = "0";
+        main.style.marginLeft = "0";
+        document.querySelector('span[onclick="openNav()"]').style.display = 'inline';
+        sidebar.style.paddingLeft="0";
+        sidebar.style.paddingRight="0";
+        map_container.style.width = "100%"; */
+
+      #sidebar a {
+        padding: 8px 8px 8px 32px;
+        text-decoration: none;
+        font-size: 25px;
+        color: #818181;
+        display: block;
+        transition: 0.3s;
+      }
+      #sidebar a:hover {
+        color: #f1f1f1;
+      }
+      #sidebar .closebtn {
+        position: absolute;
+        top: 0;
+        right: 25px;
+        font-size: 36px;
+        margin-left: 0;
+      }
+      #main {
+        transition: margin-left 0.5s;
+        padding: 10px;
+        margin-left: 0px;
+        background-color: rgb(237, 234, 234);
+      }
+
+      .depature-time {
+        padding-left: 10px;
+        padding-top: 10px;
+        margin-bottom: 0px;
+      }
+      /* Hide the overlay by default */
+      .hidden {
+        display: none;
+      }
+
+      /* Fullscreen overlay to disable interaction */
+      #loadingOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999; /* Make sure it's on top */
+        /* opacity: 0; */
+      }
+
+      /* Simple spinner */
+      .spinner {
+        border: 8px solid #f3f3f3; /* Light grey */
+        border-top: 8px solid #3498db; /* Blue */
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+      }
+
+      /* Spinner animation */
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .leaflet-control-attribution {
+        display: none !important;
+      }
+
+      .footer {
+        display: none;
+        flex-direction: column;
+        height: fit-content;
+        padding: 7px;
+        position: absolute;
+        width: 230px;
+        bottom: 4%;
+        right: 50px;
+        z-index: 1000;
+        font-size: 15px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.4); /* Slight transparency */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+        border-radius: 8px;
+        color: #333; /* Contrasting text color */
+      }
+      /* Style for the slider input */
+      .footer input[type="range"] {
+        -webkit-appearance: none; /* Removes default appearance */
+        width: 100%;
+        margin-top:6px ;
+        height: 8px; /* Height of the slider track */
+        background: #add6ef; /* Track background */
+        outline: none;
+        border-radius: 5px; /* Rounded edges for the track */
+        transition: background 0.3s ease-in-out; /* Smooth transition */
+      }
+
+      /* Track color when hovering */
+      .footer input[type="range"]:hover {
+        background: #65c6e3;
+      }
+
+      /* Custom slider thumb (the draggable button) */
+      .footer input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px; /* Thumb size */
+        height: 20px;
+        background: #007bff; /* Blue thumb for contrast */
+        border-radius: 50%; /* Circular thumb */
+        cursor: pointer;
+      }
+
+      /* Thumb color when hovering */
+      .footer input[type="range"]::-webkit-slider-thumb:hover {
+        background: #50a0f6; /* Darker blue when hovering */
+      }
+
+      /* Firefox slider styling */
+      .footer input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #007bff;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: background 0.3s ease-in-out;
+      }
+
+      /* Hover effect for Firefox */
+      .footer input[type="range"]::-moz-range-thumb:hover {
+        background: #0056b3;
+      }
+
+      .leaflet-popup {
+        transition: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">Nautilus</div>
+    <div class="container" id="container">
+      <div class="form" id="sidebar">
+        <div id="sidebarInner">
+          <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
+            >&times;</a
+          >
+          <div class="title">Input Coordinates</div>
+          <div class="field">
+            <input
+              type="text"
+              id="departure-latitude"
+              placeholder=" "
+              required
+            />
+            <label for="departure-latitude">Departure Latitude</label>
+          </div>
+          <div class="field">
+            <input
+              type="text"
+              id="departure-longitude"
+              placeholder=" "
+              required
+            />
+            <label for="departure-longitude">Departure Longitude</label>
+          </div>
+          <div class="field">
+            <input type="text" id="arrival-latitude" placeholder=" " required />
+            <label for="arrival-latitude">Arrival Latitude</label>
+          </div>
+          <div class="field">
+            <input
+              type="text"
+              id="arrival-longitude"
+              placeholder=" "
+              required
+            />
+            <label for="arrival-longitude">Arrival Longitude</label>
+          </div>
+          <div class="depature-time">Depature-time</div>
+          <div class="field">
+            <input
+              type="datetime-local"
+              id="depature-time"
+              placeholder=""
+              required
+            />
+            <!-- <label for="depature-time">Depature Time</label> -->
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="speed"
+              value="20"
+              placeholder=" "
+              required
+            />
+            <label for="speed">Speed (km/hr)</label>
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="length"
+              value="230"
+              placeholder=" "
+              required
+            />
+            <label for="length">Length (m)</label>
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="draft"
+              value="10.8"
+              placeholder=" "
+              required
+            />
+            <label for="draft">Design draft (m)</label>
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="breadth"
+              value="32.2"
+              placeholder=" "
+              required
+            />
+            <label for="breadth">Moulded breadth (m)</label>
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="displacement"
+              value="52030"
+              placeholder=" "
+              required
+            />
+            <label for="displacement">Displacement (m³)</label>
+          </div>
+          <div class="field">
+            <input
+              type="number"
+              id="block-coefficient"
+              value="0.8"
+              placeholder=" "
+              required
+            />
+            <label for="block-coefficient">Block-coefficient</label>
+          </div>
+        </div>
+        <div class="field" id="field">
+          <button class="btn" id="btn" onclick="getVoyage()">Get Voyage</button>
+          <button class="btn" id="btn1">Start</button>
+        </div>
+      </div>
+      <div id="main">
+        <span style="font-size: 30px; cursor: pointer" onclick="openNav()"
+          >&#9776;
+        </span>
+      </div>
+      <div class="map-container" id="map-container">
+        <div style="position: relative" id="map"></div>
+      </div>
+    </div>
+
+    <div id="loadingOverlay" class="hidden">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+
+    <div id="footer" class="footer">
+    </div>
+  </body>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet libraries -->
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <!-- Heatmap Plugin -->
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+  <script>
+    let sidebar = document.getElementById("sidebar");
+    let main = document.getElementById("main");
+    let map_container = document.getElementById("map-container");
+    let button = document.getElementById("btn");
+    let pathSlider = document.createElement("input");
+    let sidebarInner = document.getElementById("sidebarInner");
+    let slideContainer = document.getElementById("footer");
+    let map_main = document.getElementById("map");
+    let field = document.getElementById('field')
+    let button1 = document.getElementById('btn1')
+    let voyagePath = null;
+    var map = L.map("map", {
+      center: [16, 80], // Your desired center point (latitude, longitude)
+      zoom: 6, // Initial zoom level
+      maxZoom: 18, // Set maximum zoom level (default max for OSM is 19)
+      minZoom: 3, // Optional: set minimum zoom level
+    });
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    function openNav() {
+      sidebar.style.width = "500px";
+      main.style.marginLeft = "500px";
+      document.querySelector('span[onclick="openNav()"]').style.display =
+        "none";
+      sidebar.style.paddingLeft = "20px";
+      sidebar.style.paddingRight = "20px";
+    }
+    function closeNav() {
+      sidebar.style.width = "0";
+      main.style.marginLeft = "0";
+      document.querySelector('span[onclick="openNav()"]').style.display =
+        "inline";
+      sidebar.style.paddingLeft = "0";
+      sidebar.style.paddingRight = "0";
+      map_container.style.width = "100%";
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      loadingOverlay.style.display = "none";
+      addMarkers();
+      button1.style.display = 'none';
+    });
+    // Initialize the map
+
+    // Add OpenStreetMap tiles to the map
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    var startMarker, endMarker;
+    var startCoords = [16, 80]; // Default start coordinates
+    var endCoords = [17, 81]; // Default end coordinates
+    var pathPolyline; // To store the plotted path polyline
+
+    // var customIcon = L.icon({
+    //     iconUrl: 'ship.png', // URL for the custom icon
+    //     iconSize: [38, 40], // Size of the icon
+    //     iconAnchor: [22, 94], // Point of the icon which will correspond to the marker's location
+    //     popupAnchor: [-3, -76] // Point from which the popup should open relative to the iconAnchor
+    // });
+
+    // Add a marker with the custom icon
+    // L.marker([51.505, -0.09], { icon: customIcon }).addTo(map)
+    //     .bindPopup("I am a custom marker.").openPopup();
+
+    // Add a search control using Leaflet Control Geocoder
+    L.Control.geocoder({
+      defaultMarkGeocode: false,
+    });
+    // .on('markgeocode', function(e) {
+    //     var latlng = e.geocode.center;
+    //     L.marker(latlng, { icon: customIcon }).addTo(map)
+    //         .bindPopup(e.geocode.name).openPopup();
+    //     map.setView(latlng, 16);
+    // })
+    // .addTo(map);
+
+    // Add initial markers for Start and End points
+    function addMarkers() {
+      startMarker = L.marker(startCoords, { draggable: true })
+        .addTo(map)
+        .bindPopup("Start Point")
+        .openPopup();
+      endMarker = L.marker(endCoords, { draggable: true })
+        .addTo(map)
+        .bindPopup("End Point");
+
+      startMarker.on("dragend", function (e) {
+        var coords = startMarker.getLatLng();
+        startCoords = [coords.lat, coords.lng];
+        updateInputFields();
+      });
+
+      endMarker.on("dragend", function (e) {
+        var coords = endMarker.getLatLng();
+        endCoords = [coords.lat, coords.lng];
+        updateInputFields();
+      });
+    }
+
+    // Update input fields based on marker positions
+    function updateInputFields() {
+      document.getElementById("departure-latitude").value = startCoords[0];
+      document.getElementById("departure-longitude").value = startCoords[1];
+      document.getElementById("arrival-latitude").value = endCoords[0];
+      document.getElementById("arrival-longitude").value = endCoords[1];
+    }
+    function zoomToBounds() {
+      const depLat = document.getElementById("departure-latitude").value;
+      const depLon = document.getElementById("departure-longitude").value;
+      const arrLat = document.getElementById("arrival-latitude").value;
+      const arrLon = document.getElementById("arrival-longitude").value;
+
+      // Only zoom if both departure and arrival coordinates are filled
+      if (depLat && depLon && arrLat && arrLon) {
+        const voyagePath = [
+          [parseFloat(depLat), parseFloat(depLon)], // Departure point
+          [parseFloat(arrLat), parseFloat(arrLon)], // Arrival point
+        ];
+
+        // Fit the map view to these coordinates
+        const bounds = L.latLngBounds(voyagePath);
+        map.fitBounds(bounds); // This will zoom the map to fit both points
+      }
+    }
+    // Set coordinates from map click
+    function setFromMap(type) {
+      map.once("click", function (e) {
+        var coords = [e.latlng.lat, e.latlng.lng];
+        if (type === "start") {
+          startCoords = coords;
+          startMarker.setLatLng(coords);
+        } else if (type === "end") {
+          endCoords = coords;
+          endMarker.setLatLng(coords);
+        }
+        updateInputFields();
+      });
+    }
+    let wdata = undefined;
+    let marker = undefined;
+    // Function to get the voyage details
+    async function getVoyage() {
+      if (pathPolyline !== undefined) map.removeLayer(pathPolyline);
+      console.log("getting...");
+      loadingOverlay.style.display = "flex";
+      const start_latitude =
+        document.getElementById("departure-latitude").value;
+      const start_longitude = document.getElementById(
+        "departure-longitude"
+      ).value;
+      const end_latitude = document.getElementById("arrival-latitude").value;
+      const end_longitude = document.getElementById("arrival-longitude").value;
+      const depature_time = document.getElementById("depature-time").value;
+      const speed = document.getElementById("speed").value;
+      const length = document.getElementById("length").value;
+      const draft = document.getElementById("draft").value;
+      const breadth = document.getElementById("breadth").value;
+      const displacement = document.getElementById("displacement").value;
+      const block_coefficient =
+        document.getElementById("block-coefficient").value;
+    
+      const data = {
+        start_latitude,
+        start_longitude,
+        end_latitude,
+        end_longitude,
+        depature_time,
+        speed,
+        length,
+        draft,
+        breadth,
+        displacement,
+        block_coefficient,
+      };
+
+      await fetch("http://localhost:5500/submit", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+        .then((response) => {
+          console.log(response);
+          return response.json();
+        })
+        .then((data) => {
+          console.log(data);
+          voyagePath = data["intermediete_points"];
+          zoomToBounds();
+          console.log(voyagePath);
+          pathPolyline = L.polyline(voyagePath.map(p => [p[0],p[1]]), { color: "#6b00b3" }).addTo(map);
+          startVoyage(pathPolyline);
+          if (marker !== undefined) map.removeLayer(marker);
+        });
+    }
+    let container = document.getElementById("container");
+    function startVoyage(pathPolyline) {
+      loadingOverlay.style.display = "none";
+      button.disabled = false;
+      button1.style.removeProperty('display')
+      field.style.display = 'flex';
+      field.appendChild(button1);
+      button1.addEventListener("click", () => {
+        closeNav();
+        button.innerText = "Get Voyage";
+        pathSlider.type = "range";
+        pathSlider.min = "0";
+        pathSlider.max = `${voyagePath.length - 1}`;
+        pathSlider.value = "0";
+        pathSlider.className = "slider"; // Set class attribute
+        pathSlider.id = "parameterSlider";
+        let latC = document.createElement("span");
+        latC.innerText = "lattitude: " + decimalToDMS(voyagePath[0][0]) + " N";
+        let lonC = document.createElement("span");
+        lonC.innerText = "longitude: " + decimalToDMS(voyagePath[0][1]) + " E";
+        let wave_height = document.createElement("span");
+        wave_height.innerText = "wave height: " + voyagePath[0][2] + " m";
+        let wave_period = document.createElement("span");
+        wave_period.innerText = "wave period: " + voyagePath[0][3] + " sec";
+        let wave_dir = document.createElement("span");
+        wave_dir.innerText = "wave direction: " + voyagePath[0][4] + " \u00B0";
+        slideContainer.style.display = 'flex'
+        slideContainer.innerHTML = ""
+        slideContainer.appendChild(latC);
+        slideContainer.appendChild(lonC);
+        slideContainer.appendChild(wave_height);
+        slideContainer.appendChild(wave_period);
+        slideContainer.appendChild(wave_dir);
+        slideContainer.appendChild(pathSlider);
+        map.setView([voyagePath[0][0],voyagePath[0][1]], 7);
+        pathSlider.addEventListener("input", () => {
+          const sval = pathSlider.value;
+          latC.innerText = "latitude: " + decimalToDMS(voyagePath[sval][0]) + " N"
+          lonC.innerText = "longitude: " + decimalToDMS(voyagePath[sval][1]) + " E"
+          wave_height.innerText = "wave height: " + voyagePath[sval][2] + " m"
+          wave_period.innerText = "wave period: " + voyagePath[sval][3] + " sec"
+          wave_dir.innerText = "wave direction: " + voyagePath[sval][4] + " deg";
+          map.setView([voyagePath[sval][0],voyagePath[sval][1]], 7);
+          var customIcon = L.icon({
+            iconUrl: "../static/ship3.png", // Replace with your image URL
+            iconSize: [32, 32], // Size of the icon
+            iconAnchor: [16, 32], // Point of the icon which will correspond to marker's location
+            popupAnchor: [0, -32], // Point from which the popup should open relative to the iconAnchor
+          });
+
+          if (marker !== undefined) map.removeLayer(marker);
+          // Add a marker with the custom icon
+          marker = L.marker([voyagePath[sval][0],voyagePath[sval][1]], { icon: customIcon })
+            .addTo(map)
+            .bindPopup("This is a custom icon!");
+        });
+        var customIcon = L.icon({
+          iconUrl: "../static/ship3.png", // Replace with your image URL
+          iconSize: [32, 32], // Size of the icon
+          iconAnchor: [16, 32], // Point of the icon which will correspond to marker's location
+          popupAnchor: [0, -32], // Point from which the popup should open relative to the iconAnchor
+        });
+        if (marker !== undefined) map.removeLayer(marker);
+        // Add a marker with the custom icon
+        marker = L.marker([voyagePath[0][0],voyagePath[0][1]], { icon: customIcon })
+          .addTo(map)
+          .bindPopup("This is a custom icon!");
+      });
+    }
+
+    function decimalToDMS(decimal) {
+        const degrees = Math.floor(decimal);
+        const minutesDecimal = (decimal - degrees) * 60;
+        const minutes = Math.floor(minutesDecimal);
+        const seconds = (minutesDecimal - minutes) * 60;
+        return `${degrees}°${minutes}'${seconds.toFixed(2)}"`;
+    }
+  </script>
+</html>
