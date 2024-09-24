@@ -1,7 +1,7 @@
 
 ---
 
-# nautilus
+# Nautilus
 
 This project provides a ship routing solution between a source and destination location using the A* algorithm. The project consists of both a **web application** and a **Flutter mobile application** that allow users to enter the source and destination locations (using latitude and longitude), and the optimal route between the two points is calculated and displayed.
 
