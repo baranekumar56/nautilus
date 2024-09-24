@@ -132,4 +132,11 @@ These features are designed to make ship routing more efficient, user-friendly, 
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Authors
+
+- [@baranekumar56](https://github.com/baranekumar56)
+- [@pojith](https://www.github.com/pojith)
+- [@sithaarth24](https://github.com/sithaarth24)
+- [@sakthissb](https://github.com/sakthissb)
+
 ---
