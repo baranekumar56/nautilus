@@ -1,0 +1,41 @@
+# Use the official Google Dart image
+FROM dart:stable AS base
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Install necessary tools
+RUN apt-get update && apt-get install -y git && \
+    apt-get clean
+
+# Clone Flutter SDK
+RUN git clone https://github.com/flutter/flutter.git /flutter && \
+    cd /flutter && \
+    git checkout stable
+
+# Add Flutter to PATH
+ENV PATH="/flutter/bin:${PATH}"
+
+# Copy the pubspec.yaml and pubspec.lock files
+COPY pubspec.* ./
+
+# Get Flutter dependencies
+RUN flutter pub get
+
+# Copy the rest of the Flutter application code
+COPY . .
+
+# Build the Flutter web application
+RUN flutter build web --release
+
+# Use NGINX to serve the Flutter web app
+FROM nginx:alpine
+
+# Copy the built web app to NGINX's public directory
+COPY --from=base /app/build/web /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start NGINX when the container runs
+CMD ["nginx", "-g", "daemon off;"]
