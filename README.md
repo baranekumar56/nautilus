@@ -138,5 +138,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [@pojith](https://www.github.com/pojith)
 - [@sithaarth24](https://github.com/sithaarth24)
 - [@sakthissb](https://github.com/sakthissb)
+- [@Santhiya-sm-15](https://github.com/Santhiya-sm-15)
+- [@Subathra672004](https://github.com/Subathra672004)
 
 ---
